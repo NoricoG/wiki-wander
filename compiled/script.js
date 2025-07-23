@@ -1,5 +1,46 @@
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
+var __generator = (this && this.__generator) || function (thisArg, body) {
+    var _ = { label: 0, sent: function() { if (t[0] & 1) throw t[1]; return t[1]; }, trys: [], ops: [] }, f, y, t, g = Object.create((typeof Iterator === "function" ? Iterator : Object).prototype);
+    return g.next = verb(0), g["throw"] = verb(1), g["return"] = verb(2), typeof Symbol === "function" && (g[Symbol.iterator] = function() { return this; }), g;
+    function verb(n) { return function (v) { return step([n, v]); }; }
+    function step(op) {
+        if (f) throw new TypeError("Generator is already executing.");
+        while (g && (g = 0, op[0] && (_ = 0)), _) try {
+            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+            if (y = 0, t) op = [op[0] & 2, t.value];
+            switch (op[0]) {
+                case 0: case 1: t = op; break;
+                case 4: _.label++; return { value: op[1], done: false };
+                case 5: _.label++; y = op[1]; op = [0]; continue;
+                case 7: op = _.ops.pop(); _.trys.pop(); continue;
+                default:
+                    if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) { _ = 0; continue; }
+                    if (op[0] === 3 && (!t || (op[1] > t[0] && op[1] < t[3]))) { _.label = op[1]; break; }
+                    if (op[0] === 6 && _.label < t[1]) { _.label = t[1]; t = op; break; }
+                    if (t && _.label < t[2]) { _.label = t[2]; _.ops.push(op); break; }
+                    if (t[2]) _.ops.pop();
+                    _.trys.pop(); continue;
+            }
+            op = body.call(thisArg, _);
+        } catch (e) { op = [6, e]; y = 0; } finally { f = t = 0; }
+        if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
+    }
+};
 // setup
 var apiCallCount = 0;
+var apiUrl = 'https://en.wikipedia.org/w/api.php';
+var apiDefaultParams = {
+    format: 'json',
+    origin: '*'
+};
 document.addEventListener('DOMContentLoaded', function () {
     updateApiCounter();
     loadMainCategories();
@@ -9,111 +50,206 @@ function updateApiCounter() {
     apiCallCount++;
     document.getElementById('apiCounter').textContent = "API calls: ".concat(apiCallCount);
 }
-function callApi(url) {
-    updateApiCounter();
-    return fetch(url)
-        .then(function (response) {
-        if (!response.ok)
-            throw new Error('Network response was not ok');
-        return response.json();
+function callApi(params) {
+    return __awaiter(this, void 0, void 0, function () {
+        var url, response;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0:
+                    updateApiCounter();
+                    url = new URL(apiUrl);
+                    Object.keys(params).forEach(function (key) { return url.searchParams.append(key, params[key]); });
+                    Object.keys(apiDefaultParams).forEach(function (key) { return url.searchParams.append(key, apiDefaultParams[key]); });
+                    return [4 /*yield*/, fetch(url.toString())];
+                case 1:
+                    response = _a.sent();
+                    if (!response.ok)
+                        throw new Error('Network response was not ok');
+                    return [4 /*yield*/, response.json()];
+                case 2: return [2 /*return*/, _a.sent()];
+            }
+        });
     });
 }
+function ItemJsonToItem(data) {
+    var split = data.title.split(':');
+    var cleanTitle = split.length == 2 ? split[1] : data.title;
+    var type = split.length == 2 ? split[0] : 'Page';
+    var extract = data.extract || '';
+    return {
+        type: type,
+        pageid: data.pageid,
+        ns: data.ns,
+        cleanTitle: cleanTitle,
+        fullTitle: data.title,
+        extract: extract,
+    };
+}
 function getCategoryMembers(categoryTitle) {
-    var url = "https://en.wikipedia.org/w/api.php?action=query&list=categorymembers&cmtitle=".concat(encodeURIComponent(categoryTitle), "&cmlimit=200&format=json&origin=*");
-    return callApi(url);
+    // sandbox https://en.wikipedia.org/wiki/Special:ApiSandbox#action=query&list=categorymembers&cmtitle={categoryTitle}&cmlimit=200&format=json&origin=*
+    return callApi({
+        action: 'query',
+        list: 'categorymembers',
+        cmtitle: categoryTitle,
+        cmlimit: '200',
+    }).then(function (data) {
+        if (!data.query || !data.query.categorymembers) {
+            return [];
+        }
+        else {
+            return data.query.categorymembers.map(function (item) { return ItemJsonToItem(item); });
+        }
+    });
+}
+function getPageData(pageId) {
+    // sandbox https://en.wikipedia.org/wiki/Special:ApiSandbox#action=query&prop=extracts&exsentences=1&explaintext=1&pageids={pageId}&format=json&origin=*
+    return callApi({
+        action: 'query',
+        prop: 'extracts',
+        exsentences: '1',
+        explaintext: '1',
+        pageids: pageId.toString(),
+    });
+}
+function getMatchingPage(item) {
+    // sandbox https://en.wikipedia.org/wiki/Special:ApiSandbox#action=query&format=json&prop=extracts&titles={item.cleanTitle}&exintro=true&explaintext=true&redirects=1
+    return callApi({
+        action: 'query',
+        format: 'json',
+        prop: 'extracts',
+        titles: item.cleanTitle,
+        exsentences: '1',
+        explaintext: 'true',
+        redirects: '1',
+    }).then(function (data) {
+        console.log(data);
+        if (data.query && data.query.pages && Object.keys(data.query.pages).length === 1) {
+            var newItemKey = Object.keys(data.query.pages)[0];
+            if (newItemKey == '-1') {
+                return null;
+            }
+            var newItem = ItemJsonToItem(data.query.pages[newItemKey]);
+            if (newItem.type == 'Page') {
+                return newItem;
+            }
+        }
+        return null;
+    });
 }
 // specific functions
 function loadMainCategories() {
-    loadColumn(1, 'Category:Main_topic_classifications');
+    loadColumn(1, { pageid: -1, ns: -1, cleanTitle: 'Categories', fullTitle: 'Category:Main_topic_classifications', type: 'Category' });
     scrollToRight();
 }
-function loadColumn(columnIndex, chosen) {
+function loadColumn(columnIndex, item) {
+    document.getElementById("column".concat(columnIndex)).querySelector('.columnTitle').textContent = item.cleanTitle;
+    switch (item.type) {
+        case 'Category':
+            _loadCatColumn(columnIndex, item);
+            break;
+        case 'Page':
+            _loadPageColumn(columnIndex, item);
+            break;
+        default:
+            console.error('Unknown item type:', item.type);
+    }
+    scrollToRight();
+}
+function _loadCatColumn(columnIndex, item) {
     var column = document.getElementById("column".concat(columnIndex));
+    getMatchingPage(item).then(function (matchingPage) {
+        if (matchingPage) {
+            var pageExtract = document.createElement('p');
+            pageExtract.className = 'extract';
+            pageExtract.textContent = matchingPage.extract;
+            column.querySelector('.details').appendChild(pageExtract);
+        }
+        var catLink = document.createElement('a');
+        catLink.href = "https://en.wikipedia.org/wiki/".concat(encodeURIComponent(item.fullTitle));
+        catLink.target = '_blank';
+        catLink.textContent = "Category";
+        column.querySelector('.details').appendChild(catLink);
+        if (matchingPage) {
+            var pageLink = document.createElement('a');
+            pageLink.href = "https://en.wikipedia.org/wiki/".concat(encodeURIComponent(matchingPage.fullTitle));
+            pageLink.target = '_blank';
+            pageLink.textContent = "Page";
+            column.querySelector('.details').appendChild(pageLink);
+        }
+    });
+    var catList = column.querySelector('.categorieList');
+    catList.innerHTML = '<li>Loading...</li>';
+    var pageList = column.querySelector('.pagesList');
+    pageList.innerHTML = '<li>Loading...</li>';
+    getCategoryMembers(item.fullTitle)
+        .then(function (items) {
+        catList.innerHTML = '';
+        pageList.innerHTML = '';
+        if (items.length > 0) {
+            var sorted = items.sort(function (a, b) { return a.cleanTitle.localeCompare(b.cleanTitle); });
+            var categories = sorted.filter(function (cat) { return cat.fullTitle.startsWith('Category:') && cat.fullTitle !== 'Category:Main topic articles'; });
+            var pages = sorted.filter(function (cat) { return !cat.fullTitle.startsWith('Category:'); });
+            column.querySelector(".categoriesTitle").textContent = categories.length > 0 ? "Categories (".concat(categories.length, ")") : '';
+            column.querySelector(".pagesTitle").textContent = pages.length > 0 ? "Pages (".concat(pages.length, ")") : '';
+            catList.innerHTML = '';
+            pageList.innerHTML = '';
+            categories.forEach(function (cat) {
+                handleListItem(cat, columnIndex, catList);
+            });
+            pages.forEach(function (page) {
+                handleListItem(page, columnIndex, pageList);
+            });
+        }
+        else {
+            catList.innerHTML = '<li>No categories found.</li>';
+        }
+    });
     var nextColumn = document.getElementById("column".concat(columnIndex + 1));
     // TODO: run this only once, but when data is about to be loaded into the column
     if (!nextColumn) {
         nextColumn = addColumn();
     }
     clearColumns(columnIndex + 1);
-    var catList = column.querySelector('.categorieList');
-    catList.innerHTML = '<li>Loading...</li>';
-    var pageList = column.querySelector('.pagesList');
-    pageList.innerHTML = '<li>Loading...</li>';
-    if (chosen.startsWith('Category:')) {
-        getCategoryMembers(chosen)
-            .then(function (data) {
-            catList.innerHTML = '';
-            pageList.innerHTML = '';
-            if (data.query && data.query.categorymembers) {
-                var sorted = data.query.categorymembers.sort(function (a, b) { return a.title.localeCompare(b.title); });
-                var categories = sorted.filter(function (cat) { return cat.title.startsWith('Category:'); });
-                var pages = sorted.filter(function (cat) { return !cat.title.startsWith('Category:'); });
-                if (categories.length === 0) {
-                    column.querySelector(".categoriesTitle").textContent = "";
-                    catList.innerHTML = '';
-                }
-                else {
-                    column.querySelector(".categoriesTitle").textContent = "Categories (".concat(categories.length, ")");
-                }
-                if (pages.length === 0) {
-                    column.querySelector(".pagesTitle").textContent = "";
-                    pageList.innerHTML = '';
-                }
-                else {
-                    column.querySelector(".pagesTitle").textContent = "Pages (".concat(pages.length, ")");
-                }
-                categories.forEach(function (cat) {
-                    if (cat.title == ('Category:Main topic articles'))
-                        return;
-                    handleListItem(cat, true, columnIndex, catList, pageList, nextColumn);
-                });
-                pages.forEach(function (page) {
-                    handleListItem(page, false, columnIndex, catList, pageList, nextColumn);
-                });
-            }
-            else {
-                catList.innerHTML = '<li>No categories found.</li>';
-            }
-        });
-    }
-    else {
-        window.alert("Not implemented");
-    }
 }
-function handleListItem(item, isCategory, columnIndex, catList, pageList, nextColumn) {
+function _loadPageColumn(columnIndex, item) {
+    var column = document.getElementById("column".concat(columnIndex));
+    column.querySelector('.details').innerHTML = '';
+    var extractElement = document.createElement('p');
+    extractElement.className = 'extract';
+    extractElement.textContent = 'Loading...';
+    column.querySelector('.details').appendChild(extractElement);
+    var pageLink = document.createElement('a');
+    pageLink.href = "https://en.wikipedia.org/wiki/".concat(encodeURIComponent(item.fullTitle));
+    pageLink.target = '_blank';
+    pageLink.textContent = "Page";
+    column.querySelector('.details').appendChild(pageLink);
+    getPageData(item.pageid)
+        .then(function (data) {
+        var extract = data.query.pages[item.pageid].extract || 'No extract available.';
+        extractElement.textContent = extract;
+    });
+}
+function handleListItem(item, columnIndex, list) {
     var li = document.createElement('li');
-    li.style.cursor = 'pointer';
     var nameSpan = document.createElement('span');
-    var cleanTitle = isCategory ? item.title.replace('Category:', '') : item.title;
-    nameSpan.textContent = cleanTitle;
+    nameSpan.textContent = item.cleanTitle;
     li.appendChild(nameSpan);
     li.onclick = function () {
-        clearColumns(columnIndex + 1);
-        Array.from(catList.children).forEach(function (child) { return child.classList.remove('selected'); });
-        Array.from(pageList.children).forEach(function (child) { return child.classList.remove('selected'); });
+        removeSelection(columnIndex);
         li.classList.add('selected');
-        if (isCategory) {
-            nextColumn.querySelector('.title').innerHTML = "<a href=\"https://en.wikipedia.org/wiki/".concat(encodeURIComponent(item.title), "\" target=\"_blank\">").concat(cleanTitle, "</a>");
-            loadColumn(columnIndex + 1, item.title);
-            scrollToRight();
-        }
-        else {
-            nextColumn.querySelector('.title').innerHTML = "<a href=\"https://en.wikipedia.org/wiki/".concat(encodeURIComponent(item.title), "\" target=\"_blank\">").concat(item.title, "</a>");
-            var url = "http://en.wikipedia.org/w/api.php?action=query&prop=extracts&exsentences=1&explaintext=1&pageids=".concat(item.pageid, "&format=json&origin=*");
-            callApi(url)
-                .then(function (data) {
-                var extract = data.query.pages[item.pageid].extract || 'No extract available.';
-                nextColumn.querySelector('.extract').textContent = extract;
-                scrollToRight();
-            });
-        }
+        clearColumns(columnIndex + 1);
+        loadColumn(columnIndex + 1, item);
     };
-    if (isCategory) {
-        catList.appendChild(li);
-    }
-    else {
-        pageList.appendChild(li);
-    }
+    list.appendChild(li);
+}
+function removeSelection(columnIndex) {
+    var column = document.getElementById("column".concat(columnIndex));
+    if (!column)
+        return;
+    var catList = column.querySelector('.categorieList');
+    var pageList = column.querySelector('.pagesList');
+    Array.from(catList.children).forEach(function (child) { return child.classList.remove('selected'); });
+    Array.from(pageList.children).forEach(function (child) { return child.classList.remove('selected'); });
 }
 function scrollToRight() {
     document.getElementById('body').scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'end' });
@@ -125,7 +261,7 @@ function addColumn() {
     newColumn.id = "column".concat(newColumnIndex);
     newColumn.className = 'column';
     // should correspond with the HTML structure
-    newColumn.innerHTML = "\n        <h2 class=\"title\"></h2>\n        <p class=\"extract\"></p>\n        <h3 class=\"categoriesTitle\"></h3>\n        <ul class=\"categorieList\"></ul>\n        <h3 class=\"pagesTitle\"></h3>\n        <ul class=\"pagesList\"></ul>\n    ";
+    newColumn.innerHTML = "\n        <h2 class=\"columnTitle\"></h2>\n        <div class=\"details\"></div>\n        <h3 class=\"categoriesTitle\"></h3>\n        <ul class=\"categorieList\"></ul>\n        <h3 class=\"pagesTitle\"></h3>\n        <ul class=\"pagesList\"></ul>\n    ";
     document.getElementById('columns').appendChild(newColumn);
     return document.getElementById("column".concat(newColumnIndex));
 }
@@ -137,8 +273,8 @@ function clearColumns(startingIndex) {
     }
 }
 function clearColumn(column) {
-    column.querySelector('.title').textContent = '';
-    column.querySelector('.extract').textContent = '';
+    column.querySelector('.columnTitle').textContent = '';
+    column.querySelector('.details').innerHTML = '';
     column.querySelector('.categoriesTitle').textContent = '';
     column.querySelector('.categorieList').innerHTML = '';
     column.querySelector('.pagesTitle').textContent = '';

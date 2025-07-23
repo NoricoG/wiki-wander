@@ -23,6 +23,7 @@ ul {
 
 li {
     margin-bottom: 0.5em;
+    cursor: pointer;
 }
 
 .headerText {
@@ -36,11 +37,30 @@ li {
     flex-shrink: 0;
 }
 
+.columnTitle {
+    margin-bottom: 0.5em;
+}
+
+.details {
+    display: flex;
+    flex-direction: column;
+}
+
+.details p {
+    margin: 0.5em 0;
+}
+
 .selected {
     background-color: #e0f7fa;
     font-weight: bold;
     border-radius: 4px;
     padding: 4px 8px;
+}
+
+#header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 #columns {
@@ -52,4 +72,8 @@ li {
     width: 15em;
     max-width: 20em;
     height: 120vh; /* Set extra height to have consistent scrolling using scrollToRight()*/
+}
+
+#firstColumnTitle, #firstColumnDetails {
+    display: none;
 }

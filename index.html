@@ -9,7 +9,7 @@
 </head>
 <body id="body">
     <header>
-        <div id="header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div id="header">
             <h1>WikiWander</h1>
             <p class="headerText">Language: English</p>
             <p class="headerText" id="apiCounter">Used API calls: 0</p>
@@ -17,6 +17,8 @@
     </header>
     <div id="columns">
         <div id="column1" class="column">
+            <h2 class="columnTitle" id="firstColumnTitle">Categories</h2>
+            <div class="details" id="firstColumnDetails"></div>
             <h2 class="categoriesTitle">Categories</h2>
             <ul class="categorieList"></ul>
             <h3 class="pagesTitle"></h3>
@@ -24,8 +26,8 @@
         </div>
         <!-- should correspond with addColumn() -->
         <div id="column2" class="column">
-            <h2 class="title"></h2>
-            <p class="extract"></p>
+            <h2 class="columnTitle"></h2>
+            <div class="details"></div>
             <h3 class="categoriesTitle"></h3>
             <ul class="categorieList"></ul>
             <h3 class="pagesTitle"></h3>
