@@ -20,10 +20,11 @@ There are no usage limits excepts the Wikipedia API limit of 500 anonymous reque
 ### Related
 - Wikipedia
   - Category tree
-    - [English Articles](https://en.m.wikipedia.org/wiki/Special:CategoryTree?target=Category%3AMain+topic+classifications&mode=all&namespaces=)
-    - [English Contents](https://en.m.wikipedia.org/w/index.php?title=Special:CategoryTree&target=Contents&mode=20&hideprefix=20&showcount=1&&notranslations=)
-    - [Simple English Contents](https://simple.m.wikipedia.org/wiki/Special:CategoryTree?dotree=Show+Tree&mode=all&target=Contents)
-    - [Dutch Contents](https://nl.m.wikipedia.org/w/index.php?title=Speciaal:Categorieboom&target=Alles&mode=20&hideprefix=20&showcount=1&&notranslations=)
+    - [English Articles](https://en.wikipedia.org/wiki/Special:CategoryTree?target=Category%3AMain+topic+classifications&mode=all&namespaces=)
+    - [English Contents](https://en.wikipedia.org/w/index.php?title=Special:CategoryTree&target=Contents&mode=20&hideprefix=20&showcount=1&&notranslations=)
+    - [Simple English Contents](https://simple.wikipedia.org/wiki/Special:CategoryTree?dotree=Show+Tree&mode=all&target=Contents)
+    - [Dutch Contents](https://nl.wikipedia.org/w/index.php?title=Speciaal:Categorieboom&target=Alles&mode=20&hideprefix=20&showcount=1&&notranslations=)
+    - [German Hauptkategorie](https://de.wikipedia.org/w/index.php?title=Spezial:Kategorienbaum&target=%21Hauptkategorie&mode=20&hideprefix=20&showcount=1&&notranslations=)
   - [Contents](https://en.wikipedia.org/wiki/Wikipedia:Contents)
   - [Special:RandomInCategory](https://en.wikipedia.org/wiki/Special:RandomInCategory)
 - [Wikimap: A map of every geotagged article in Wikipedia](https://wikimap.wiki/)

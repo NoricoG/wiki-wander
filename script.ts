@@ -1,18 +1,13 @@
-// setup
-
-let apiCallCount: number = 0;
-let apiUrl: string = 'https://en.wikipedia.org/w/api.php';
-const apiDefaultParams = {
-    format: 'json',
-    origin: '*'
-};
-
-document.addEventListener('DOMContentLoaded', () => {
-    updateApiCounter();
-    loadMainCategories();
-});
-
 // type definitions
+
+interface Locale {
+    name: string;
+    apiUrl: string;
+    pageUrl: string;
+    startingCategory: string;
+    excludeItems: string[];
+    categoryPrefix: string;
+}
 
 interface Item {
     type: string; // Category, Page or something else
@@ -23,6 +18,65 @@ interface Item {
     extract?: string;
 }
 
+// setup
+
+let localeOptions: Locale[] = [
+    {
+        name: 'English (Main Classifications)',
+        apiUrl: 'https://en.wikipedia.org/w/api.php',
+        pageUrl: 'https://en.wikipedia.org/wiki/',
+        startingCategory: 'Category:Main_topic_classifications',
+        excludeItems: ['Category:Main topic classifications'],
+        categoryPrefix: 'Category'
+    },
+    {
+        name: 'English (Contents)',
+        apiUrl: 'https://en.wikipedia.org/w/api.php',
+        pageUrl: 'https://en.wikipedia.org/wiki/',
+        startingCategory: 'Category:Contents',
+        excludeItems: [],
+        categoryPrefix: 'Category'
+    },
+    {
+        name: 'Simple English',
+        apiUrl: 'https://simple.wikipedia.org/w/api.php',
+        pageUrl: 'https://simple.wikipedia.org/wiki/',
+        startingCategory: 'Category:Contents',
+        excludeItems: [],
+        categoryPrefix: 'Category'
+    },
+    {
+        name: 'Nederlands',
+        apiUrl: 'https://nl.wikipedia.org/w/api.php',
+        pageUrl: 'https://nl.wikipedia.org/wiki/',
+        startingCategory: 'Categorie:Alles',
+        excludeItems: ['Hoofdpagina'],
+        categoryPrefix: 'Categorie'
+    },
+    {
+        name: 'Deutsch',
+        apiUrl: 'https://de.wikipedia.org/w/api.php',
+        pageUrl: 'https://de.wikipedia.org/wiki/',
+        startingCategory: 'Kategorie:!Hauptkategorie',
+        excludeItems: [],
+        categoryPrefix: 'Kategorie'
+    }
+
+];
+let locale: Locale = localeOptions[0];
+let apiCallCount: number = 0;
+let apiPageLimit: number = 200;
+const apiDefaultParams = {
+    format: 'json',
+    origin: '*'
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    createLocalePicker();
+    updateApiCounter();
+    loadMainCategories();
+});
+
 // helper functions
 
 function updateApiCounter(): void {
@@ -32,7 +86,7 @@ function updateApiCounter(): void {
 
 async function callApi(params: Record<string, string>): Promise<any> {
     updateApiCounter();
-    const url = new URL(apiUrl);
+    const url = new URL(locale.apiUrl);
     Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
     Object.keys(apiDefaultParams).forEach(key => url.searchParams.append(key, apiDefaultParams[key]));
     const response = await fetch(url.toString());
@@ -43,7 +97,10 @@ async function callApi(params: Record<string, string>): Promise<any> {
 function ItemJsonToItem(data: any): Item {
     const split = data.title.split(':');
     const cleanTitle = split.length == 2 ? split[1] : data.title;
-    const type = split.length == 2 ? split[0] : 'Page';
+    let type = split.length == 2 ? split[0] : 'Page';
+    if (type == locale.categoryPrefix) {
+        type = 'Category';
+    }
     const extract = data.extract || '';
     return {
         type: type,
@@ -94,7 +151,6 @@ function getMatchingPage(item: Item): Promise<Item | null> {
             explaintext: 'true',
             redirects: '1',
         }).then((data: any) => {
-            console.log(data);
             if (data.query && data.query.pages && Object.keys(data.query.pages).length === 1) {
                 const newItemKey = Object.keys(data.query.pages)[0];
                 if (newItemKey == '-1') {
@@ -112,7 +168,7 @@ function getMatchingPage(item: Item): Promise<Item | null> {
 // specific functions
 
 function loadMainCategories(): void {
-    loadColumn(1, { pageid: -1, ns: -1, cleanTitle: 'Categories', fullTitle: 'Category:Main_topic_classifications', type: 'Category' });
+    loadColumn(1, { pageid: -1, ns: -1, cleanTitle: 'Categories', fullTitle: locale.startingCategory, type: 'Category' });
     scrollToRight();
 }
 
@@ -143,14 +199,14 @@ function _loadCatColumn(columnIndex: number, item: Item): void {
         }
 
         const catLink = document.createElement('a');
-        catLink.href = `https://en.wikipedia.org/wiki/${encodeURIComponent(item.fullTitle)}`;
+        catLink.href = `${locale.pageUrl}${encodeURIComponent(item.fullTitle)}`;
         catLink.target = '_blank';
         catLink.textContent = "Category";
         column.querySelector('.details')!.appendChild(catLink);
 
         if (matchingPage) {
             const pageLink = document.createElement('a');
-            pageLink.href = `https://en.wikipedia.org/wiki/${encodeURIComponent(matchingPage.fullTitle)}`;
+            pageLink.href = `${locale.pageUrl}${encodeURIComponent(matchingPage.fullTitle)}`;
             pageLink.target = '_blank';
             pageLink.textContent = "Page";
             column.querySelector('.details')!.appendChild(pageLink);
@@ -167,13 +223,25 @@ function _loadCatColumn(columnIndex: number, item: Item): void {
         catList.innerHTML = '';
         pageList.innerHTML = '';
         if (items.length > 0) {
-            const sorted = items.sort((a, b) => a.cleanTitle.localeCompare(b.cleanTitle));
+            const sorted = items.sort((a, b) => a.cleanTitle.localeCompare(b.cleanTitle)).filter(cat => !locale.excludeItems.includes(cat.cleanTitle));
+            const categories = sorted.filter(cat => cat.fullTitle.startsWith(locale.categoryPrefix));
+            const pages = sorted.filter(cat => !cat.fullTitle.startsWith(locale.categoryPrefix));
 
-            const categories = sorted.filter(cat => cat.fullTitle.startsWith('Category:') && cat.fullTitle !== 'Category:Main topic articles');
-            const pages = sorted.filter(cat => !cat.fullTitle.startsWith('Category:'));
+            let categoriesTitle = '';
+            if (categories.length === apiPageLimit) {
+                categoriesTitle = `Categories (${apiPageLimit})+`;
+            } else if (categories.length > 0) {
+                categoriesTitle = `Categories (${categories.length})`;
+            }
+            let pagesTitle = '';
+            if (pages.length === apiPageLimit) {
+                pagesTitle = `Pages (${apiPageLimit})+`;
+            } else if (pages.length > 0) {
+                pagesTitle = `Pages (${pages.length})`;
+            }
 
-            column.querySelector(`.categoriesTitle`)!.textContent = categories.length > 0 ? `Categories (${categories.length})` : '';
-            column.querySelector(`.pagesTitle`)!.textContent = pages.length > 0 ? `Pages (${pages.length})` : '';
+            column.querySelector(`.categoriesTitle`)!.textContent = categoriesTitle;
+            column.querySelector(`.pagesTitle`)!.textContent = pagesTitle;
 
             catList.innerHTML = '';
             pageList.innerHTML = '';
@@ -208,7 +276,7 @@ function _loadPageColumn(columnIndex: number, item: Item): void {
     column.querySelector('.details')!.appendChild(extractElement);
 
     const pageLink = document.createElement('a');
-    pageLink.href = `https://en.wikipedia.org/wiki/${encodeURIComponent(item.fullTitle)}`;
+    pageLink.href = `${locale.pageUrl}${encodeURIComponent(item.fullTitle)}`;
     pageLink.target = '_blank';
     pageLink.textContent = "Page";
     column.querySelector('.details')!.appendChild(pageLink);
@@ -232,7 +300,22 @@ function handleListItem(item: Item, columnIndex: number, list: HTMLUListElement)
         loadColumn(columnIndex + 1, item);
     };
     list.appendChild(li);
+}
 
+function createLocalePicker(): void {
+    const langSelector = document.getElementById('langSelector') as HTMLSelectElement;
+    localeOptions.forEach((loc, idx) => {
+        const option = document.createElement('option');
+        option.value = idx.toString();
+        option.textContent = loc.name;
+        if (idx === 0) option.selected = true;
+        langSelector.appendChild(option);
+    });
+    langSelector.addEventListener('change', () => {
+        locale = localeOptions[parseInt(langSelector.value)];
+        clearColumns(1);
+        loadMainCategories();
+    });
 }
 
 function removeSelection(columnIndex: number): void {

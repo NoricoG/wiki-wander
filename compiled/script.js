@@ -34,14 +34,59 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
         if (op[0] & 5) throw op[1]; return { value: op[0] ? op[1] : void 0, done: true };
     }
 };
+// type definitions
 // setup
+var localeOptions = [
+    {
+        name: 'English (Main Classifications)',
+        apiUrl: 'https://en.wikipedia.org/w/api.php',
+        pageUrl: 'https://en.wikipedia.org/wiki/',
+        startingCategory: 'Category:Main_topic_classifications',
+        excludeItems: ['Category:Main topic classifications'],
+        categoryPrefix: 'Category'
+    },
+    {
+        name: 'English (Contents)',
+        apiUrl: 'https://en.wikipedia.org/w/api.php',
+        pageUrl: 'https://en.wikipedia.org/wiki/',
+        startingCategory: 'Category:Contents',
+        excludeItems: [],
+        categoryPrefix: 'Category'
+    },
+    {
+        name: 'Simple English',
+        apiUrl: 'https://simple.wikipedia.org/w/api.php',
+        pageUrl: 'https://simple.wikipedia.org/wiki/',
+        startingCategory: 'Category:Contents',
+        excludeItems: [],
+        categoryPrefix: 'Category'
+    },
+    {
+        name: 'Nederlands',
+        apiUrl: 'https://nl.wikipedia.org/w/api.php',
+        pageUrl: 'https://nl.wikipedia.org/wiki/',
+        startingCategory: 'Categorie:Alles',
+        excludeItems: ['Hoofdpagina'],
+        categoryPrefix: 'Categorie'
+    },
+    {
+        name: 'Deutsch',
+        apiUrl: 'https://de.wikipedia.org/w/api.php',
+        pageUrl: 'https://de.wikipedia.org/wiki/',
+        startingCategory: 'Kategorie:!Hauptkategorie',
+        excludeItems: [],
+        categoryPrefix: 'Kategorie'
+    }
+];
+var locale = localeOptions[0];
 var apiCallCount = 0;
-var apiUrl = 'https://en.wikipedia.org/w/api.php';
+var apiPageLimit = 200;
 var apiDefaultParams = {
     format: 'json',
     origin: '*'
 };
 document.addEventListener('DOMContentLoaded', function () {
+    createLocalePicker();
     updateApiCounter();
     loadMainCategories();
 });
@@ -57,7 +102,7 @@ function callApi(params) {
             switch (_a.label) {
                 case 0:
                     updateApiCounter();
-                    url = new URL(apiUrl);
+                    url = new URL(locale.apiUrl);
                     Object.keys(params).forEach(function (key) { return url.searchParams.append(key, params[key]); });
                     Object.keys(apiDefaultParams).forEach(function (key) { return url.searchParams.append(key, apiDefaultParams[key]); });
                     return [4 /*yield*/, fetch(url.toString())];
@@ -75,6 +120,9 @@ function ItemJsonToItem(data) {
     var split = data.title.split(':');
     var cleanTitle = split.length == 2 ? split[1] : data.title;
     var type = split.length == 2 ? split[0] : 'Page';
+    if (type == locale.categoryPrefix) {
+        type = 'Category';
+    }
     var extract = data.extract || '';
     return {
         type: type,
@@ -122,7 +170,6 @@ function getMatchingPage(item) {
         explaintext: 'true',
         redirects: '1',
     }).then(function (data) {
-        console.log(data);
         if (data.query && data.query.pages && Object.keys(data.query.pages).length === 1) {
             var newItemKey = Object.keys(data.query.pages)[0];
             if (newItemKey == '-1') {
@@ -138,7 +185,7 @@ function getMatchingPage(item) {
 }
 // specific functions
 function loadMainCategories() {
-    loadColumn(1, { pageid: -1, ns: -1, cleanTitle: 'Categories', fullTitle: 'Category:Main_topic_classifications', type: 'Category' });
+    loadColumn(1, { pageid: -1, ns: -1, cleanTitle: 'Categories', fullTitle: locale.startingCategory, type: 'Category' });
     scrollToRight();
 }
 function loadColumn(columnIndex, item) {
@@ -165,13 +212,13 @@ function _loadCatColumn(columnIndex, item) {
             column.querySelector('.details').appendChild(pageExtract);
         }
         var catLink = document.createElement('a');
-        catLink.href = "https://en.wikipedia.org/wiki/".concat(encodeURIComponent(item.fullTitle));
+        catLink.href = "".concat(locale.pageUrl).concat(encodeURIComponent(item.fullTitle));
         catLink.target = '_blank';
         catLink.textContent = "Category";
         column.querySelector('.details').appendChild(catLink);
         if (matchingPage) {
             var pageLink = document.createElement('a');
-            pageLink.href = "https://en.wikipedia.org/wiki/".concat(encodeURIComponent(matchingPage.fullTitle));
+            pageLink.href = "".concat(locale.pageUrl).concat(encodeURIComponent(matchingPage.fullTitle));
             pageLink.target = '_blank';
             pageLink.textContent = "Page";
             column.querySelector('.details').appendChild(pageLink);
@@ -186,11 +233,25 @@ function _loadCatColumn(columnIndex, item) {
         catList.innerHTML = '';
         pageList.innerHTML = '';
         if (items.length > 0) {
-            var sorted = items.sort(function (a, b) { return a.cleanTitle.localeCompare(b.cleanTitle); });
-            var categories = sorted.filter(function (cat) { return cat.fullTitle.startsWith('Category:') && cat.fullTitle !== 'Category:Main topic articles'; });
-            var pages = sorted.filter(function (cat) { return !cat.fullTitle.startsWith('Category:'); });
-            column.querySelector(".categoriesTitle").textContent = categories.length > 0 ? "Categories (".concat(categories.length, ")") : '';
-            column.querySelector(".pagesTitle").textContent = pages.length > 0 ? "Pages (".concat(pages.length, ")") : '';
+            var sorted = items.sort(function (a, b) { return a.cleanTitle.localeCompare(b.cleanTitle); }).filter(function (cat) { return !locale.excludeItems.includes(cat.cleanTitle); });
+            var categories = sorted.filter(function (cat) { return cat.fullTitle.startsWith(locale.categoryPrefix); });
+            var pages = sorted.filter(function (cat) { return !cat.fullTitle.startsWith(locale.categoryPrefix); });
+            var categoriesTitle = '';
+            if (categories.length === apiPageLimit) {
+                categoriesTitle = "Categories (".concat(apiPageLimit, ")+");
+            }
+            else if (categories.length > 0) {
+                categoriesTitle = "Categories (".concat(categories.length, ")");
+            }
+            var pagesTitle = '';
+            if (pages.length === apiPageLimit) {
+                pagesTitle = "Pages (".concat(apiPageLimit, ")+");
+            }
+            else if (pages.length > 0) {
+                pagesTitle = "Pages (".concat(pages.length, ")");
+            }
+            column.querySelector(".categoriesTitle").textContent = categoriesTitle;
+            column.querySelector(".pagesTitle").textContent = pagesTitle;
             catList.innerHTML = '';
             pageList.innerHTML = '';
             categories.forEach(function (cat) {
@@ -219,7 +280,7 @@ function _loadPageColumn(columnIndex, item) {
     extractElement.textContent = 'Loading...';
     column.querySelector('.details').appendChild(extractElement);
     var pageLink = document.createElement('a');
-    pageLink.href = "https://en.wikipedia.org/wiki/".concat(encodeURIComponent(item.fullTitle));
+    pageLink.href = "".concat(locale.pageUrl).concat(encodeURIComponent(item.fullTitle));
     pageLink.target = '_blank';
     pageLink.textContent = "Page";
     column.querySelector('.details').appendChild(pageLink);
@@ -241,6 +302,22 @@ function handleListItem(item, columnIndex, list) {
         loadColumn(columnIndex + 1, item);
     };
     list.appendChild(li);
+}
+function createLocalePicker() {
+    var langSelector = document.getElementById('langSelector');
+    localeOptions.forEach(function (loc, idx) {
+        var option = document.createElement('option');
+        option.value = idx.toString();
+        option.textContent = loc.name;
+        if (idx === 0)
+            option.selected = true;
+        langSelector.appendChild(option);
+    });
+    langSelector.addEventListener('change', function () {
+        locale = localeOptions[parseInt(langSelector.value)];
+        clearColumns(1);
+        loadMainCategories();
+    });
 }
 function removeSelection(columnIndex) {
     var column = document.getElementById("column".concat(columnIndex));
