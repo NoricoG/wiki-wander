@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WikiWander</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="compiled/script.js"></script>
+</head>
+<body id="body">
+    <header>
+        <div id="header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h1>WikiWander</h1>
+            <p class="headerText">Language: English</p>
+            <p class="headerText" id="apiCounter">Used API calls: 0</p>
+        </div>
+    </header>
+    <div id="columns">
+        <div id="column1" class="column">
+            <h2 class="categoriesTitle">Categories</h2>
+            <ul class="categorieList"></ul>
+            <h3 class="pagesTitle"></h3>
+            <ul class="pagesList"></ul>
+        </div>
+        <!-- should correspond with addColumn() -->
+        <div id="column2" class="column">
+            <h2 class="title"></h2>
+            <p class="extract"></p>
+            <h3 class="categoriesTitle"></h3>
+            <ul class="categorieList"></ul>
+            <h3 class="pagesTitle"></h3>
+            <ul class="pagesList"></ul>
+        </div>
+    </div>
+</body>
+</html>

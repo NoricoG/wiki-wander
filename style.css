@@ -1,0 +1,55 @@
+body {
+    font-family: Arial, sans-serif;
+    padding: 2em;
+    overflow-x: auto; /* Enable page-wide horizontal scrolling */
+    width: max-content; /* Allow body to grow with its contents */
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+h1 {
+    margin: 0;
+    margin-right: 1em;
+}
+
+ul {
+    list-style: none;
+    padding: 0;
+}
+
+li {
+    margin-bottom: 0.5em;
+}
+
+.headerText {
+    margin-left: 1em;
+    /* margin: 4px; */
+}
+
+.column {
+    max-width: 20em;
+    margin-right: 3em;
+    flex-shrink: 0;
+}
+
+.selected {
+    background-color: #e0f7fa;
+    font-weight: bold;
+    border-radius: 4px;
+    padding: 4px 8px;
+}
+
+#columns {
+    display: flex;
+    width: max-content; /* Allow columns to expand horizontally */
+}
+
+#column1 {
+    width: 15em;
+    max-width: 20em;
+    height: 120vh; /* Set extra height to have consistent scrolling using scrollToRight()*/
+}
