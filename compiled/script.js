@@ -38,19 +38,11 @@ var __generator = (this && this.__generator) || function (thisArg, body) {
 // setup
 var localeOptions = [
     {
-        name: 'English (Main Classifications)',
+        name: 'English',
         apiUrl: 'https://en.wikipedia.org/w/api.php',
         pageUrl: 'https://en.wikipedia.org/wiki/',
         startingCategory: 'Category:Main_topic_classifications',
         excludeItems: ['Category:Main topic classifications'],
-        categoryPrefix: 'Category'
-    },
-    {
-        name: 'English (Contents)',
-        apiUrl: 'https://en.wikipedia.org/w/api.php',
-        pageUrl: 'https://en.wikipedia.org/wiki/',
-        startingCategory: 'Category:Contents',
-        excludeItems: [],
         categoryPrefix: 'Category'
     },
     {
@@ -73,7 +65,7 @@ var localeOptions = [
         name: 'Deutsch',
         apiUrl: 'https://de.wikipedia.org/w/api.php',
         pageUrl: 'https://de.wikipedia.org/wiki/',
-        startingCategory: 'Kategorie:!Hauptkategorie',
+        startingCategory: 'Kategorie:Sachsystematik',
         excludeItems: [],
         categoryPrefix: 'Kategorie'
     }
@@ -116,7 +108,7 @@ function callApi(params) {
         });
     });
 }
-function ItemJsonToItem(data) {
+function pageJsonToItem(data) {
     var split = data.title.split(':');
     var cleanTitle = split.length == 2 ? split[1] : data.title;
     var type = split.length == 2 ? split[0] : 'Page';
@@ -145,42 +137,68 @@ function getCategoryMembers(categoryTitle) {
             return [];
         }
         else {
-            return data.query.categorymembers.map(function (item) { return ItemJsonToItem(item); });
+            return data.query.categorymembers.map(function (item) { return pageJsonToItem(item); });
         }
-    });
-}
-function getPageData(pageId) {
-    // sandbox https://en.wikipedia.org/wiki/Special:ApiSandbox#action=query&prop=extracts&exsentences=1&explaintext=1&pageids={pageId}&format=json&origin=*
-    return callApi({
-        action: 'query',
-        prop: 'extracts',
-        exsentences: '1',
-        explaintext: '1',
-        pageids: pageId.toString(),
     });
 }
 function getMatchingPage(item) {
-    // sandbox https://en.wikipedia.org/wiki/Special:ApiSandbox#action=query&format=json&prop=extracts&titles={item.cleanTitle}&exintro=true&explaintext=true&redirects=1
+    if (item.type != 'Category') {
+        console.log('Matching page can only be retrieved for a Category');
+        return Promise.resolve(null);
+    }
+    // sandbox https://en.wikipedia.org/wiki/Special:ApiSandbox#action=query&titles={item.cleanTitle}&redirects=1&prop=extracts&exsentences=1&explaintext=1&list=search&srsearch={item.cleanTitle}&srlimit=1
     return callApi({
         action: 'query',
-        format: 'json',
-        prop: 'extracts',
+        //extract
         titles: item.cleanTitle,
+        redirects: '1',
+        prop: 'extracts',
         exsentences: '1',
         explaintext: 'true',
-        redirects: '1',
+        // word count
+        list: 'search',
+        srsearch: item.cleanTitle,
+        srlimit: '1',
     }).then(function (data) {
-        if (data.query && data.query.pages && Object.keys(data.query.pages).length === 1) {
-            var newItemKey = Object.keys(data.query.pages)[0];
+        var _a, _b;
+        var pages = (_a = data.query) === null || _a === void 0 ? void 0 : _a.pages;
+        if (pages && Object.keys(pages).length === 1) {
+            var newItemKey = Object.keys(pages)[0];
             if (newItemKey == '-1') {
                 return null;
             }
-            var newItem = ItemJsonToItem(data.query.pages[newItemKey]);
-            if (newItem.type == 'Page') {
-                return newItem;
+            var newItem = pageJsonToItem(pages[newItemKey]);
+            if (newItem.type != 'Page') {
+                return null;
             }
+            var search = (_b = data.query) === null || _b === void 0 ? void 0 : _b.search;
+            if (search) {
+                newItem.wordCount = search[0].wordcount || null;
+            }
+            return newItem;
         }
         return null;
+    });
+}
+function enrichPageData(item) {
+    // sandbox https://en.wikipedia.org/wiki/Special:ApiSandbox#action=query&pageids={pageId}&prop=extracts&exsentences=2&explaintext=1&list=search&srsearch={item.fullTitle}&srlimit=1&format=json&origin=*
+    return callApi({
+        action: 'query',
+        // extract
+        pageids: item.pageid.toString(),
+        prop: 'extracts',
+        exsentences: '1',
+        explaintext: '1',
+        // word count
+        list: 'search',
+        srsearch: item.fullTitle,
+        srlimit: '1',
+    }).then(function (data) {
+        item.extract = data.query.pages[item.pageid].extract || '';
+        if (data.query.search) {
+            item.wordCount = data.query.search[0].wordcount || null;
+        }
+        return item;
     });
 }
 // specific functions
@@ -222,6 +240,8 @@ function _loadCatColumn(columnIndex, item) {
             pageLink.target = '_blank';
             pageLink.textContent = "Page";
             column.querySelector('.details').appendChild(pageLink);
+            console.log("Aadslkjfhasd;klfhasdf;hklasdf;hjkl" + matchingPage.wordCount);
+            showWordCount(column, matchingPage.wordCount);
         }
     });
     var catList = column.querySelector('.categorieList');
@@ -284,11 +304,22 @@ function _loadPageColumn(columnIndex, item) {
     pageLink.target = '_blank';
     pageLink.textContent = "Page";
     column.querySelector('.details').appendChild(pageLink);
-    getPageData(item.pageid)
-        .then(function (data) {
-        var extract = data.query.pages[item.pageid].extract || 'No extract available.';
+    enrichPageData(item)
+        .then(function (updatedItem) {
+        var extract = updatedItem.extract || 'No extract available.';
         extractElement.textContent = extract;
+        showWordCount(column, updatedItem.wordCount);
     });
+}
+function showWordCount(column, wordCount) {
+    if (wordCount) {
+        var readingSpeed = parseInt(document.getElementById('readingSpeed').value);
+        var time = (wordCount / readingSpeed).toFixed(1);
+        var wordCountElement = document.createElement('p');
+        wordCountElement.className = 'wordCount';
+        wordCountElement.textContent = "".concat(wordCount, " words (").concat(time, " minutes)");
+        column.querySelector('.details').appendChild(wordCountElement);
+    }
 }
 function handleListItem(item, columnIndex, list) {
     var li = document.createElement('li');

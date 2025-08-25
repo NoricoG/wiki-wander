@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,12 +8,20 @@
     <link rel="stylesheet" href="style.css">
     <script src="compiled/script.js"></script>
 </head>
+
 <body id="body">
     <header>
         <div id="header">
             <h1>WikiWander</h1>
             <label for="langSelector" class="headerText">Language:</label>
             <select id="langSelector" class="headerText"></select>
+            <label for="readingSpeed" class="headerText">Reading Speed:</label>
+            <select id="readingSpeed" class="headerText">
+                <option value="150">150 wpm</option>
+                <option value="200" selected>200 wpm</option>
+                <option value="250">250 wpm</option>
+                <option value="300">300 wpm</option>
+            </select>
             <p id="apiCounter" class="headerText">API calls: 0</p>
         </div>
     </header>
@@ -36,4 +45,5 @@
         </div>
     </div>
 </body>
+
 </html>

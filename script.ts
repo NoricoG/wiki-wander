@@ -16,25 +16,18 @@ interface Item {
     cleanTitle: string;
     fullTitle: string;
     extract?: string;
+    wordCount?: number;
 }
 
 // setup
 
 let localeOptions: Locale[] = [
     {
-        name: 'English (Main Classifications)',
+        name: 'English',
         apiUrl: 'https://en.wikipedia.org/w/api.php',
         pageUrl: 'https://en.wikipedia.org/wiki/',
         startingCategory: 'Category:Main_topic_classifications',
         excludeItems: ['Category:Main topic classifications'],
-        categoryPrefix: 'Category'
-    },
-    {
-        name: 'English (Contents)',
-        apiUrl: 'https://en.wikipedia.org/w/api.php',
-        pageUrl: 'https://en.wikipedia.org/wiki/',
-        startingCategory: 'Category:Contents',
-        excludeItems: [],
         categoryPrefix: 'Category'
     },
     {
@@ -57,7 +50,7 @@ let localeOptions: Locale[] = [
         name: 'Deutsch',
         apiUrl: 'https://de.wikipedia.org/w/api.php',
         pageUrl: 'https://de.wikipedia.org/wiki/',
-        startingCategory: 'Kategorie:!Hauptkategorie',
+        startingCategory: 'Kategorie:Sachsystematik',
         excludeItems: [],
         categoryPrefix: 'Kategorie'
     }
@@ -94,7 +87,7 @@ async function callApi(params: Record<string, string>): Promise<any> {
     return await response.json();
 }
 
-function ItemJsonToItem(data: any): Item {
+function pageJsonToItem(data: any): Item {
     const split = data.title.split(':');
     const cleanTitle = split.length == 2 ? split[1] : data.title;
     let type = split.length == 2 ? split[0] : 'Page';
@@ -109,7 +102,6 @@ function ItemJsonToItem(data: any): Item {
         cleanTitle: cleanTitle,
         fullTitle: data.title,
         extract: extract,
-
     };
 }
 
@@ -124,44 +116,69 @@ function getCategoryMembers(categoryTitle: string): Promise<any> {
         if (!data.query || !data.query.categorymembers) {
             return [];
         } else {
-            return data.query.categorymembers.map((item: any) => ItemJsonToItem(item));
+            return data.query.categorymembers.map((item: any) => pageJsonToItem(item));
         }
     });
 }
 
-function getPageData(pageId: number): Promise<any> {
-    // sandbox https://en.wikipedia.org/wiki/Special:ApiSandbox#action=query&prop=extracts&exsentences=1&explaintext=1&pageids={pageId}&format=json&origin=*
+function getMatchingPage(item: Item): Promise<Item | null> {
+    if (item.type != 'Category') {
+        console.log('Matching page can only be retrieved for a Category');
+        return Promise.resolve(null);
+    }
+    // sandbox https://en.wikipedia.org/wiki/Special:ApiSandbox#action=query&titles={item.cleanTitle}&redirects=1&prop=extracts&exsentences=1&explaintext=1&list=search&srsearch={item.cleanTitle}&srlimit=1
     return callApi({
         action: 'query',
+        //extract
+        titles: item.cleanTitle,
+        redirects: '1',
         prop: 'extracts',
         exsentences: '1',
-        explaintext: '1',
-        pageids: pageId.toString(),
+        explaintext: 'true',
+        // word count
+        list: 'search',
+        srsearch: item.cleanTitle,
+        srlimit: '1',
+    }).then((data: any) => {
+        const pages = data.query?.pages;
+        if (pages && Object.keys(pages).length === 1) {
+            const newItemKey = Object.keys(pages)[0];
+            if (newItemKey == '-1') {
+                return null;
+            }
+            const newItem = pageJsonToItem(pages[newItemKey]);
+            if (newItem.type != 'Page') {
+                return null;
+            }
+            const search = data.query?.search;
+            if (search) {
+                newItem.wordCount = search[0].wordcount || null;
+            }
+            return newItem;
+        }
+        return null;
     });
 }
 
-function getMatchingPage(item: Item): Promise<Item | null> {
-    // sandbox https://en.wikipedia.org/wiki/Special:ApiSandbox#action=query&format=json&prop=extracts&titles={item.cleanTitle}&exintro=true&explaintext=true&redirects=1
+function enrichPageData(item: Item): Promise<Item> {
+    // sandbox https://en.wikipedia.org/wiki/Special:ApiSandbox#action=query&pageids={pageId}&prop=extracts&exsentences=2&explaintext=1&list=search&srsearch={item.fullTitle}&srlimit=1&format=json&origin=*
     return callApi({
-            action: 'query',
-            format: 'json',
-            prop: 'extracts',
-            titles: item.cleanTitle,
-            exsentences: '1',
-            explaintext: 'true',
-            redirects: '1',
-        }).then((data: any) => {
-            if (data.query && data.query.pages && Object.keys(data.query.pages).length === 1) {
-                const newItemKey = Object.keys(data.query.pages)[0];
-                if (newItemKey == '-1') {
-                    return null;
-                }
-                const newItem = ItemJsonToItem(data.query.pages[newItemKey]);
-                if (newItem.type == 'Page') {
-                    return newItem;
-                }
-            }
-            return null;
+        action: 'query',
+        // extract
+        pageids: item.pageid.toString(),
+        prop: 'extracts',
+        exsentences: '1',
+        explaintext: '1',
+        // word count
+        list: 'search',
+        srsearch: item.fullTitle,
+        srlimit: '1',
+    }).then((data: any) => {
+        item.extract = data.query.pages[item.pageid].extract || '';
+        if (data.query.search) {
+            item.wordCount = data.query.search[0].wordcount || null;
+        }
+        return item;
     });
 }
 
@@ -210,6 +227,9 @@ function _loadCatColumn(columnIndex: number, item: Item): void {
             pageLink.target = '_blank';
             pageLink.textContent = "Page";
             column.querySelector('.details')!.appendChild(pageLink);
+
+            console.log("Aadslkjfhasd;klfhasdf;hklasdf;hjkl" + matchingPage.wordCount)
+            showWordCount(column, matchingPage.wordCount);
         }
     });
 
@@ -219,43 +239,43 @@ function _loadCatColumn(columnIndex: number, item: Item): void {
     pageList.innerHTML = '<li>Loading...</li>';
 
     getCategoryMembers(item.fullTitle)
-    .then((items: Item[]) => {
-        catList.innerHTML = '';
-        pageList.innerHTML = '';
-        if (items.length > 0) {
-            const sorted = items.sort((a, b) => a.cleanTitle.localeCompare(b.cleanTitle)).filter(cat => !locale.excludeItems.includes(cat.cleanTitle));
-            const categories = sorted.filter(cat => cat.fullTitle.startsWith(locale.categoryPrefix));
-            const pages = sorted.filter(cat => !cat.fullTitle.startsWith(locale.categoryPrefix));
-
-            let categoriesTitle = '';
-            if (categories.length === apiPageLimit) {
-                categoriesTitle = `Categories (${apiPageLimit})+`;
-            } else if (categories.length > 0) {
-                categoriesTitle = `Categories (${categories.length})`;
-            }
-            let pagesTitle = '';
-            if (pages.length === apiPageLimit) {
-                pagesTitle = `Pages (${apiPageLimit})+`;
-            } else if (pages.length > 0) {
-                pagesTitle = `Pages (${pages.length})`;
-            }
-
-            column.querySelector(`.categoriesTitle`)!.textContent = categoriesTitle;
-            column.querySelector(`.pagesTitle`)!.textContent = pagesTitle;
-
+        .then((items: Item[]) => {
             catList.innerHTML = '';
             pageList.innerHTML = '';
+            if (items.length > 0) {
+                const sorted = items.sort((a, b) => a.cleanTitle.localeCompare(b.cleanTitle)).filter(cat => !locale.excludeItems.includes(cat.cleanTitle));
+                const categories = sorted.filter(cat => cat.fullTitle.startsWith(locale.categoryPrefix));
+                const pages = sorted.filter(cat => !cat.fullTitle.startsWith(locale.categoryPrefix));
 
-            categories.forEach(cat => {
-                handleListItem(cat, columnIndex, catList);
-            });
-            pages.forEach(page => {
-                handleListItem(page, columnIndex, pageList);
-            });
-        } else {
-            catList.innerHTML = '<li>No categories found.</li>';
-        }
-    });
+                let categoriesTitle = '';
+                if (categories.length === apiPageLimit) {
+                    categoriesTitle = `Categories (${apiPageLimit})+`;
+                } else if (categories.length > 0) {
+                    categoriesTitle = `Categories (${categories.length})`;
+                }
+                let pagesTitle = '';
+                if (pages.length === apiPageLimit) {
+                    pagesTitle = `Pages (${apiPageLimit})+`;
+                } else if (pages.length > 0) {
+                    pagesTitle = `Pages (${pages.length})`;
+                }
+
+                column.querySelector(`.categoriesTitle`)!.textContent = categoriesTitle;
+                column.querySelector(`.pagesTitle`)!.textContent = pagesTitle;
+
+                catList.innerHTML = '';
+                pageList.innerHTML = '';
+
+                categories.forEach(cat => {
+                    handleListItem(cat, columnIndex, catList);
+                });
+                pages.forEach(page => {
+                    handleListItem(page, columnIndex, pageList);
+                });
+            } else {
+                catList.innerHTML = '<li>No categories found.</li>';
+            }
+        });
 
     let nextColumn: HTMLElement | null = document.getElementById(`column${columnIndex + 1}`);
     // TODO: run this only once, but when data is about to be loaded into the column
@@ -281,11 +301,24 @@ function _loadPageColumn(columnIndex: number, item: Item): void {
     pageLink.textContent = "Page";
     column.querySelector('.details')!.appendChild(pageLink);
 
-    getPageData(item.pageid)
-        .then((data: any) => {
-            const extract = data.query.pages[item.pageid].extract || 'No extract available.';
+    enrichPageData(item)
+        .then((updatedItem: Item) => {
+            const extract = updatedItem.extract || 'No extract available.';
             extractElement.textContent = extract;
+
+            showWordCount(column, updatedItem.wordCount);
         });
+}
+
+function showWordCount(column: HTMLElement, wordCount: number | null): void {
+    if (wordCount) {
+        const readingSpeed = parseInt((document.getElementById('readingSpeed') as HTMLSelectElement).value);
+        const time = (wordCount / readingSpeed).toFixed(1);
+        const wordCountElement = document.createElement('p');
+        wordCountElement.className = 'wordCount';
+        wordCountElement.textContent = `${wordCount} words (${time} minutes)`;
+        column.querySelector('.details')!.appendChild(wordCountElement);
+    }
 }
 
 function handleListItem(item: Item, columnIndex: number, list: HTMLUListElement) {

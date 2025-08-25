@@ -22,7 +22,8 @@ ul {
 }
 
 li {
-    margin-bottom: 0.5em;
+    padding-top: 0.2em;
+    padding-bottom: 0.2em;
     cursor: pointer;
 }
 
@@ -48,6 +49,10 @@ li {
 
 .details p {
     margin: 0.5em 0;
+}
+
+.details a {
+    margin: 0.2em 0;
 }
 
 .selected {
